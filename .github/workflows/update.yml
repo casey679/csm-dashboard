@@ -1,0 +1,43 @@
+name: Update dashboard data
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Fetch latest data
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          SLACK_BOOK_CALLS_CHANNEL_ID: ${{ secrets.SLACK_BOOK_CALLS_CHANNEL_ID }}
+          SLACK_PAYMENT_WINS_CHANNEL_ID: ${{ secrets.SLACK_PAYMENT_WINS_CHANNEL_ID }}
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_CONTENT_DATABASE_ID: ${{ secrets.NOTION_CONTENT_DATABASE_ID }}
+          NOTION_STATUS_PROPERTY: ${{ secrets.NOTION_STATUS_PROPERTY }}
+          NOTION_POSTED_STATUS_VALUE: ${{ secrets.NOTION_POSTED_STATUS_VALUE }}
+          NOTION_DATE_PROPERTY: ${{ secrets.NOTION_DATE_PROPERTY }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          YOUTUBE_CHANNEL_ID: ${{ secrets.YOUTUBE_CHANNEL_ID }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+        run: node fetch-data.js
+
+      - name: Commit updated data
+        run: |
+          git config user.name "dashboard-bot"
+          git config user.email "actions@github.com"
+          git add data/dashboard-data.json
+          git diff --staged --quiet || git commit -m "Update dashboard data"
+          git push
