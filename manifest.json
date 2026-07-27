@@ -1,0 +1,9 @@
+{
+  "name": "This Week",
+  "short_name": "This Week",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#F4F1EC",
+  "theme_color": "#F4F1EC",
+  "icons": []
+}
