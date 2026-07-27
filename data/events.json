@@ -1,0 +1,15 @@
+{
+  "_instructions": "Add every World Tour date here, soonest first doesn't matter, the script finds the next one automatically. Edit this file directly on github.com whenever dates change. Format must stay YYYY-MM-DD.",
+  "events": [
+    { "name": "Copenhagen", "date": "2026-05-15" },
+    { "name": "Amsterdam", "date": "2026-06-19" },
+    { "name": "Marbella", "date": "2026-07-17" },
+    { "name": "London", "date": "2026-08-21" },
+    { "name": "Milan", "date": "2026-09-18" },
+    { "name": "Paris", "date": "2026-10-16" },
+    { "name": "Dubai", "date": "2026-11-20" },
+    { "name": "Dublin", "date": "2026-12-11" },
+    { "name": "Cape Town", "date": "2027-01-15" },
+    { "name": "Miami", "date": "2027-02-19" }
+  ]
+}
