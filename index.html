@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="This Week">
 <link rel="manifest" href="manifest.json">
-<title>This Week</title>
+<title>Just Dashboard</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 
@@ -47,16 +47,16 @@
     <div class="word">CSM</div>
     <div class="eyebrow" id="liveBadge"><span class="dot"></span>live</div>
   </div>
-  <h1>this week</h1>
+  <h1>just dashboard</h1>
   <div class="range" id="dateRange">—</div>
 
   <div class="grid">
     <div class="stat">
-      <div class="label">ig followers</div>
-      <div class="num" id="igCount">—</div>
+      <div class="label">posted on instagram</div>
+      <div class="num" id="igContentCount">—</div>
     </div>
     <div class="stat">
-      <div class="label">content posted</div>
+      <div class="label">posted total</div>
       <div class="num" id="contentCount">—</div>
     </div>
     <div class="stat">
@@ -90,7 +90,7 @@ async function loadDashboard(){
     const res = await fetch('data/dashboard-data.json?_=' + Date.now());
     const data = await res.json();
     document.getElementById('dateRange').textContent = data.dateRange || '—';
-    document.getElementById('igCount').textContent = data.igCount || '—';
+    document.getElementById('igContentCount').textContent = data.igContentCount || '—';
     document.getElementById('contentCount').textContent = data.contentCount || '—';
     document.getElementById('salesCount').textContent = data.salesCount || '—';
     document.getElementById('eventDays').textContent = data.eventDays || '—';
