@@ -185,7 +185,7 @@ async function main() {
     paymentTotal: payments ? `€${payments.total.toLocaleString()}` : previous.paymentTotal ?? '—',
     paymentNote: payments ? `${payments.count} payment${payments.count === 1 ? '' : 's'}, ${payments.products.join(', ') || 'no product data'}` : previous.paymentNote ?? '',
     youtubeSubs: youtube ? youtube.subscribers.toLocaleString() : previous.youtubeSubs ?? '—',
-    youtubeVideos: youtube ? String(youtube.videos) : previous.youtubeVideos ?? '—',
+    youtubeVideos: youtube ? youtube.views.toLocaleString() : previous.youtubeVideos ?? '—',
     eventDays: nextEvent ? `${nextEvent.days} days` : previous.eventDays ?? '—',
     eventName: nextEvent ? nextEvent.name : previous.eventName ?? '—',
     lastUpdated: new Date().toUTCString(),
