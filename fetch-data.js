@@ -1,8 +1,10 @@
-// Pulls real numbers from Slack, Google Sheets, and YouTube, then writes
-// data/dashboard-data.json. Runs on a schedule via GitHub Actions
+// Pulls real numbers from Slack, Google Sheets, YouTube, and Instagram, then
+// writes data/dashboard-data.json. Runs on a schedule via GitHub Actions
 // (see .github/workflows/update.yml), or manually with: node fetch-data.js
 //
-// Every value needed comes from an environment variable / GitHub secret.
+// Every value needed comes from an environment variable / GitHub secret,
+// except Instagram, which reads the public profile page directly (no
+// secrets needed for that one).
 // Anything not configured yet is skipped gracefully, the dashboard just
 // keeps showing the last good value for that field instead of breaking.
 
@@ -16,9 +18,9 @@ const {
   GOOGLE_SHEETS_ID,
   YOUTUBE_API_KEY,
   YOUTUBE_CHANNEL_ID,
-  IG_USER_ID,
-  IG_ACCESS_TOKEN,
 } = process.env;
+
+const INSTAGRAM_HANDLE = 'askschuette';
 
 function getWeekStart() {
   const now = new Date();
@@ -134,16 +136,40 @@ async function getYouTubeStats() {
   };
 }
 
+// Reads the follower count straight off the public Instagram profile page,
+// no app, no token, no login needed. Instagram embeds it in the page's
+// meta description, something like:
+// "21.6K Followers, 312 Following, 519 Posts - See Instagram photos..."
+function parseFollowerString(str) {
+  str = str.trim().toUpperCase();
+  if (str.endsWith('K')) return Math.round(parseFloat(str) * 1000);
+  if (str.endsWith('M')) return Math.round(parseFloat(str) * 1000000);
+  return parseInt(str.replace(/,/g, ''), 10);
+}
+
 async function getInstagramFollowers() {
-  if (!IG_USER_ID || !IG_ACCESS_TOKEN) return null;
-  const url = `https://graph.facebook.com/v19.0/${IG_USER_ID}?fields=followers_count&access_token=${IG_ACCESS_TOKEN}`;
-  const res = await fetch(url);
-  const data = await res.json();
-  if (!data.followers_count) {
-    console.error('Instagram error', data);
+  try {
+    const res = await fetch(`https://www.instagram.com/${INSTAGRAM_HANDLE}/`, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      },
+    });
+    if (!res.ok) {
+      console.error('Instagram fetch failed', res.status);
+      return null;
+    }
+    const html = await res.text();
+    const match = html.match(/content="([\d.,]+[KM]?) Followers/i);
+    if (!match) {
+      console.error('Instagram followers not found in page');
+      return null;
+    }
+    return parseFollowerString(match[1]);
+  } catch (e) {
+    console.error('Instagram error', e);
     return null;
   }
-  return data.followers_count;
 }
 
 async function getNextEvent() {
