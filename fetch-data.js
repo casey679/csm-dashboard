@@ -1,4 +1,4 @@
-// Pulls real numbers from Slack, Notion, and YouTube, then writes
+// Pulls real numbers from Slack, Google Sheets, and YouTube, then writes
 // data/dashboard-data.json. Runs on a schedule via GitHub Actions
 // (see .github/workflows/update.yml), or manually with: node fetch-data.js
 //
@@ -12,11 +12,8 @@ const {
   SLACK_BOT_TOKEN,
   SLACK_BOOK_CALLS_CHANNEL_ID,
   SLACK_PAYMENT_WINS_CHANNEL_ID,
-  NOTION_TOKEN,
-  NOTION_CONTENT_DATABASE_ID,
-  NOTION_STATUS_PROPERTY,
-  NOTION_POSTED_STATUS_VALUE,
-  NOTION_DATE_PROPERTY,
+  GOOGLE_SHEETS_API_KEY,
+  GOOGLE_SHEETS_ID,
   YOUTUBE_API_KEY,
   YOUTUBE_CHANNEL_ID,
   IG_USER_ID,
@@ -83,35 +80,44 @@ async function getPaymentWinsThisWeek() {
   return { total, count, products };
 }
 
+// Reads the "Posting Tracker" tab of the Content Tracker sheet.
+// Column A holds dates written like "Fri May 01" (no year).
+// Column N holds the daily total across all platforms, already summed.
+// This adds up every row whose date falls between this week's Monday and today.
 async function getContentPostedThisWeek() {
-  if (!NOTION_TOKEN || !NOTION_CONTENT_DATABASE_ID || !NOTION_STATUS_PROPERTY || !NOTION_DATE_PROPERTY) {
-    return null;
-  }
-  const isoWeekStart = weekStart.toISOString().slice(0, 10);
-  const body = {
-    filter: {
-      and: [
-        { property: NOTION_STATUS_PROPERTY, status: { equals: NOTION_POSTED_STATUS_VALUE } },
-        { property: NOTION_DATE_PROPERTY, date: { on_or_after: isoWeekStart } },
-      ],
-    },
-    page_size: 100,
-  };
-  const res = await fetch(`https://api.notion.com/v1/databases/${NOTION_CONTENT_DATABASE_ID}/query`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${NOTION_TOKEN}`,
-      'Notion-Version': '2022-06-28',
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  });
+  if (!GOOGLE_SHEETS_API_KEY || !GOOGLE_SHEETS_ID) return null;
+
+  const range = encodeURIComponent("Posting Tracker!A5:N1000");
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEETS_ID}/values/${range}?key=${GOOGLE_SHEETS_API_KEY}`;
+  const res = await fetch(url);
   const data = await res.json();
-  if (!data.results) {
-    console.error('Notion error', data);
+
+  if (!data.values) {
+    console.error('Google Sheets error', data);
     return null;
   }
-  return data.results.length;
+
+  const now = new Date();
+  const currentYear = now.getUTCFullYear();
+  let total = 0;
+
+  for (const row of data.values) {
+    const dateStr = row[0];
+    const totalStr = row[13]; // column N
+    if (!dateStr || !totalStr) continue;
+
+    // "Fri May 01" -> drop the weekday, parse "May 01 2026"
+    const parts = dateStr.trim().split(/\s+/);
+    if (parts.length < 3) continue;
+    const rowDate = new Date(`${parts[1]} ${parts[2]} ${currentYear}`);
+    if (isNaN(rowDate)) continue;
+
+    if (rowDate >= weekStart && rowDate <= now) {
+      total += parseInt(totalStr, 10) || 0;
+    }
+  }
+
+  return total;
 }
 
 async function getYouTubeStats() {
