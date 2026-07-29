@@ -1,10 +1,8 @@
-// Pulls real numbers from Slack, Google Sheets, YouTube, and Instagram, then
-// writes data/dashboard-data.json. Runs on a schedule via GitHub Actions
+// Pulls real numbers from Slack, Google Sheets, and YouTube, then writes
+// data/dashboard-data.json. Runs on a schedule via GitHub Actions
 // (see .github/workflows/update.yml), or manually with: node fetch-data.js
 //
-// Every value needed comes from an environment variable / GitHub secret,
-// except Instagram, which reads the public profile page directly (no
-// secrets needed for that one).
+// Every value needed comes from an environment variable / GitHub secret.
 // Anything not configured yet is skipped gracefully, the dashboard just
 // keeps showing the last good value for that field instead of breaking.
 
@@ -19,8 +17,6 @@ const {
   YOUTUBE_API_KEY,
   YOUTUBE_CHANNEL_ID,
 } = process.env;
-
-const INSTAGRAM_HANDLE = 'askschuette';
 
 function getWeekStart() {
   const now = new Date();
@@ -82,11 +78,14 @@ async function getPaymentWinsThisWeek() {
   return { total, count, products };
 }
 
-// Reads the "Posting Tracker" tab of the Content Tracker sheet.
+// Reads a single column's daily totals from the "Posting Tracker" tab of
+// the Content Tracker sheet and sums every row that falls within the
+// current week (Monday through today).
 // Column A holds dates written like "Fri May 01" (no year).
-// Column N holds the daily total across all platforms, already summed.
-// This adds up every row whose date falls between this week's Monday and today.
-async function getContentPostedThisWeek() {
+// columnIndex is zero-based: column M is index 12, column N is index 13.
+let sheetRowsCache = null;
+async function getSheetRows() {
+  if (sheetRowsCache) return sheetRowsCache;
   if (!GOOGLE_SHEETS_API_KEY || !GOOGLE_SHEETS_ID) return null;
 
   const range = encodeURIComponent("Posting Tracker!A5:N1000");
@@ -98,15 +97,22 @@ async function getContentPostedThisWeek() {
     console.error('Google Sheets error', data);
     return null;
   }
+  sheetRowsCache = data.values;
+  return sheetRowsCache;
+}
+
+async function getColumnTotalThisWeek(columnIndex) {
+  const rows = await getSheetRows();
+  if (!rows) return null;
 
   const now = new Date();
   const currentYear = now.getUTCFullYear();
   let total = 0;
 
-  for (const row of data.values) {
+  for (const row of rows) {
     const dateStr = row[0];
-    const totalStr = row[13]; // column N
-    if (!dateStr || !totalStr) continue;
+    const valueStr = row[columnIndex];
+    if (!dateStr || !valueStr) continue;
 
     // "Fri May 01" -> drop the weekday, parse "May 01 2026"
     const parts = dateStr.trim().split(/\s+/);
@@ -115,11 +121,19 @@ async function getContentPostedThisWeek() {
     if (isNaN(rowDate)) continue;
 
     if (rowDate >= weekStart && rowDate <= now) {
-      total += parseInt(totalStr, 10) || 0;
+      total += parseInt(valueStr, 10) || 0;
     }
   }
 
   return total;
+}
+
+async function getInstagramContentPostedThisWeek() {
+  return getColumnTotalThisWeek(12); // column M
+}
+
+async function getTotalContentPostedThisWeek() {
+  return getColumnTotalThisWeek(13); // column N
 }
 
 async function getYouTubeStats() {
@@ -134,42 +148,6 @@ async function getYouTubeStats() {
     views: parseInt(stats.viewCount, 10),
     videos: parseInt(stats.videoCount, 10),
   };
-}
-
-// Reads the follower count straight off the public Instagram profile page,
-// no app, no token, no login needed. Instagram embeds it in the page's
-// meta description, something like:
-// "21.6K Followers, 312 Following, 519 Posts - See Instagram photos..."
-function parseFollowerString(str) {
-  str = str.trim().toUpperCase();
-  if (str.endsWith('K')) return Math.round(parseFloat(str) * 1000);
-  if (str.endsWith('M')) return Math.round(parseFloat(str) * 1000000);
-  return parseInt(str.replace(/,/g, ''), 10);
-}
-
-async function getInstagramFollowers() {
-  try {
-    const res = await fetch(`https://www.instagram.com/${INSTAGRAM_HANDLE}/`, {
-      headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      },
-    });
-    if (!res.ok) {
-      console.error('Instagram fetch failed', res.status);
-      return null;
-    }
-    const html = await res.text();
-    const match = html.match(/content="([\d.,]+[KM]?) Followers/i);
-    if (!match) {
-      console.error('Instagram followers not found in page');
-      return null;
-    }
-    return parseFollowerString(match[1]);
-  } catch (e) {
-    console.error('Instagram error', e);
-    return null;
-  }
 }
 
 async function getNextEvent() {
@@ -194,19 +172,19 @@ async function main() {
     previous = {};
   }
 
-  const [calls, payments, contentCount, youtube, igFollowers, nextEvent] = await Promise.all([
+  const [calls, payments, igContentCount, totalContentCount, youtube, nextEvent] = await Promise.all([
     getCallsBookedThisWeek(),
     getPaymentWinsThisWeek(),
-    getContentPostedThisWeek(),
+    getInstagramContentPostedThisWeek(),
+    getTotalContentPostedThisWeek(),
     getYouTubeStats(),
-    getInstagramFollowers(),
     getNextEvent(),
   ]);
 
   const data = {
     dateRange: formatDateRange(),
-    igCount: igFollowers !== null ? igFollowers.toLocaleString() : previous.igCount ?? '—',
-    contentCount: contentCount !== null ? String(contentCount) : previous.contentCount ?? '—',
+    igContentCount: igContentCount !== null ? String(igContentCount) : previous.igContentCount ?? '—',
+    contentCount: totalContentCount !== null ? String(totalContentCount) : previous.contentCount ?? '—',
     salesCount: calls !== null ? String(calls) : previous.salesCount ?? '—',
     paymentTotal: payments ? `€${payments.total.toLocaleString()}` : previous.paymentTotal ?? '—',
     paymentNote: payments ? `${payments.count} payment${payments.count === 1 ? '' : 's'}, ${payments.products.join(', ') || 'no product data'}` : previous.paymentNote ?? '',
