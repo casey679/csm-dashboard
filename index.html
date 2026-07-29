@@ -38,11 +38,6 @@
   .payments .label{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.06em;text-transform:lowercase;margin-bottom:6px}
   .payments .amount{font-family:var(--disp);font-size:30px}
   .payments .note{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-top:4px}
-  .section-label{font-family:var(--mono);font-size:10.5px;color:var(--orange);letter-spacing:.12em;text-transform:lowercase;margin:26px 0 10px}
-  .blockers{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--orange);border-radius:4px;padding:4px 0}
-  .blocker-item{padding:12px 16px;font-size:13.5px;border-bottom:1px solid var(--line)}
-  .blocker-item:last-child{border-bottom:none}
-  .empty{padding:16px;font-family:var(--mono);font-size:12.5px;color:var(--muted);text-align:center}
   .footer{margin-top:34px;font-family:var(--mono);font-size:10.5px;color:var(--muted);text-align:center}
 </style>
 </head>
@@ -86,9 +81,6 @@
     <div class="note" id="paymentNote">—</div>
   </div>
 
-  <div class="section-label">waiting on you</div>
-  <div class="blockers" id="blockersList"><div class="empty">loading…</div></div>
-
   <div class="footer" id="lastUpdated">—</div>
 </div>
 
@@ -113,30 +105,8 @@ async function loadDashboard(){
   }
 }
 
-async function loadBlockers(){
-  try{
-    const res = await fetch('data/blockers.json?_=' + Date.now());
-    const data = await res.json();
-    const list = document.getElementById('blockersList');
-    list.innerHTML = '';
-    if(!data.blockers || data.blockers.length === 0){
-      list.innerHTML = '<div class="empty">nothing waiting on you</div>';
-      return;
-    }
-    data.blockers.forEach(text => {
-      const row = document.createElement('div');
-      row.className = 'blocker-item';
-      row.textContent = text;
-      list.appendChild(row);
-    });
-  }catch(e){
-    console.error('Failed to load blockers', e);
-  }
-}
-
 function refreshAll(){
   loadDashboard();
-  loadBlockers();
 }
 
 refreshAll();
